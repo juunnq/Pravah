@@ -1,0 +1,55 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ── Virtual environments ────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Simulation / ML outputs (regenerated — never commit) ─
+results/
+results_new/
+results_backup/
+results_analysis/
+figures/
+runs/
+outputs/
+*.parquet
+*.csv
+*.npy
+*.npz
+# ML models & training data are large/regenerable → distribute out-of-band
+models/
+*.pt
+*.pth
+*.joblib
+*.pkl
+*.onnx
+
+# ── Data (large; distribute via Zenodo, not git) ────────
+data/
+
+# ── Editor / IDE / OS ───────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+*.tmp
+*.bak
+*.log
+
+# internal planning/working documents
+PHASE*.md

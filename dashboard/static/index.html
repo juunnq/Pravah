@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crowd Safety — Control Room</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --txt:#c9d1d9;
+          --dim:#8b949e; --clear:#3fb950; --watch:#d29922; --amber:#f0883e;
+          --critical:#f85149; --accent:#58a6ff; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--txt);
+         font:14px/1.45 "Segoe UI", system-ui, sans-serif; padding:16px; }
+  h1 { font-size:17px; font-weight:600; margin-bottom:2px; }
+  .sub { color:var(--dim); font-size:12px; margin-bottom:14px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .panel { background:var(--panel); border:1px solid var(--line);
+           border-radius:8px; padding:12px; }
+  .banner { font-weight:700; font-size:13px; padding:6px 10px;
+            border-radius:6px; margin-bottom:8px; display:flex;
+            justify-content:space-between; }
+  canvas { width:100%; display:block; border-radius:4px; }
+  .row { display:grid; grid-template-columns:2fr 1fr; gap:14px; margin-top:14px; }
+  .controls { display:flex; align-items:center; gap:10px; margin-top:14px; }
+  button { background:var(--accent); border:0; color:#04121f; font-weight:700;
+           padding:6px 16px; border-radius:6px; cursor:pointer; }
+  input[type=range] { flex:1; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  td, th { padding:4px 6px; border-bottom:1px solid var(--line); text-align:left; }
+  th { color:var(--dim); font-weight:600; }
+  .best { color:var(--clear); font-weight:700; }
+  .stat { font-size:22px; font-weight:700; }
+  .statlbl { color:var(--dim); font-size:11px; }
+  .stats { display:flex; gap:22px; margin-bottom:8px; }
+</style>
+</head>
+<body>
+<h1>Crowd Safety Twin — Control Room (replay)</h1>
+<div class="sub">Same fall, same 150 people, same bridge — release policy decides who is exposed.
+Live components: density provider → threshold detector → trained forecaster.</div>
+
+<div class="grid2">
+  <div class="panel"><div id="banner-burst" class="banner"></div>
+    <canvas id="venue-burst" width="1040" height="400"></canvas></div>
+  <div class="panel"><div id="banner-phased" class="banner"></div>
+    <canvas id="venue-phased" width="1040" height="400"></canvas></div>
+</div>
+
+<div class="row">
+  <div class="panel">
+    <div class="stats">
+      <div><div class="stat" id="s-t">0s</div><div class="statlbl">time</div></div>
+      <div><div class="stat" id="s-pinned">–</div><div class="statlbl">pinned (burst / phased)</div></div>
+      <div><div class="stat" id="s-fc">–</div><div class="statlbl">30 s forecast peak (burst / phased)</div></div>
+    </div>
+    <canvas id="trend" width="1400" height="260"></canvas>
+  </div>
+  <div>
+    <div class="panel" style="margin-bottom:14px">
+      <th>Playbook — release policies ranked by crowd-at-risk (physics sweep)</th>
+      <table id="playbook"><tr><th>policy</th><th>width</th><th>at-risk</th></tr></table>
+    </div>
+    <div class="panel">
+      <th>Agent calls — burst arm (advisory replay)</th>
+      <div id="calls" style="font-size:12px; max-height:180px; overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="play">▶ Play</button>
+  <input type="range" id="seek" min="0" value="0">
+  <span id="tlabel" style="color:var(--dim)"></span>
+</div>
+
+<script>
+const BANDC = {clear:"var(--clear)", watch:"var(--watch)",
+               amber:"var(--amber)", critical:"var(--critical)"};
+let R = {}, N = 0, k = 0, playing = false, latch = {burst:["clear",null], phased:["clear",null]};
+const RANK = {clear:0, watch:1, amber:2, critical:3};
+
+function heat(v){ // 0..5+ -> color
+  const t = Math.min(v/5, 1);
+  return `rgba(${Math.round(255*t)},${Math.round(90*(1-t)+60)},40,${0.15+0.75*t})`;
+}
+
+function drawVenue(arm){
+  const d = R[arm], tick = d.ticks[k];
+  const cv = document.getElementById("venue-"+arm), ctx = cv.getContext("2d");
+  const [x0,x1,y0,y1] = d.extent, sx = cv.width/(x1-x0), sy = cv.height/(y1-y0);
+  ctx.fillStyle = "#0d1117"; ctx.fillRect(0,0,cv.width,cv.height);
+  const g = tick.grid;                       // grid[iy][ix], iy up
+  for(let iy=0; iy<g.length; iy++) for(let ix=0; ix<g[0].length; ix++){
+    if(g[iy][ix] > 0.2){
+      ctx.fillStyle = heat(g[iy][ix]);
+      ctx.fillRect(ix*sx, cv.height-(iy+1)*sy, sx, sy);
+    }
+  }
+  // danger zone outline
+  const [zx0,zx1,zy0,zy1] = d.zone;
+  ctx.strokeStyle = "rgba(248,81,73,.5)"; ctx.setLineDash([5,4]);
+  ctx.strokeRect(zx0*sx, cv.height-zy1*sy, (zx1-zx0)*sx, (zy1-zy0)*sy);
+  ctx.setLineDash([]);
+  // walls
+  ctx.strokeStyle = "#e6edf3"; ctx.lineWidth = 2; ctx.beginPath();
+  for(const [[ax,ay],[bx,by]] of d.walls){
+    ctx.moveTo(ax*sx, cv.height-ay*sy); ctx.lineTo(bx*sx, cv.height-by*sy);
+  }
+  ctx.stroke(); ctx.lineWidth = 1;
+  // agents
+  ctx.fillStyle = "#9ecbff";
+  for(const [x,y] of tick.agents){
+    ctx.beginPath(); ctx.arc(x*sx, cv.height-y*sy, 3, 0, 7); ctx.fill();
+  }
+  // latched banner
+  if(RANK[tick.band] > RANK[latch[arm][0]]) latch[arm] = [tick.band, tick.t];
+  const [b, since] = latch[arm];
+  const el = document.getElementById("banner-"+arm);
+  el.style.background = "rgba(0,0,0,.25)";
+  el.style.color = BANDC[b].replace("var(","").replace(")","") ? "" : "";
+  el.style.color = getComputedStyle(document.documentElement)
+                     .getPropertyValue("--"+b);
+  el.innerHTML = `<span>${arm.toUpperCase()} RELEASE</span>` +
+    `<span>t=${tick.t}s · peak ${tick.peak} ped/m² · ` +
+    `[${b.toUpperCase()}${since!==null ? " since "+since+"s" : ""}]</span>`;
+}
+
+function drawTrend(){
+  const cv = document.getElementById("trend"), ctx = cv.getContext("2d");
+  ctx.fillStyle = "#161b22"; ctx.fillRect(0,0,cv.width,cv.height);
+  const maxP = 130;
+  const colors = {burst:"#f0883e", phased:"#58a6ff"};
+  ctx.strokeStyle = "#30363d";
+  ctx.strokeRect(0,0,cv.width,cv.height);
+  for(const arm of ["burst","phased"]){
+    const ticks = R[arm].ticks;
+    ctx.strokeStyle = colors[arm]; ctx.lineWidth = 2; ctx.beginPath();
+    for(let i=0; i<=k && i<ticks.length; i++){
+      const x = i/(N-1)*cv.width, y = cv.height - ticks[i].pinned/maxP*cv.height;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    // forecast dot at t+30
+    const t = R[arm].ticks[Math.min(k, ticks.length-1)];
+    const fx = Math.min((k+30)/(N-1),1)*cv.width;
+    const fy = cv.height - Math.min(t.forecast_peak*20,maxP)/maxP*cv.height;
+    ctx.fillStyle = colors[arm]; ctx.globalAlpha=.5;
+    ctx.beginPath(); ctx.arc(fx,fy,4,0,7); ctx.fill(); ctx.globalAlpha=1;
+  }
+  ctx.fillStyle = "#8b949e"; ctx.font = "11px sans-serif";
+  ctx.fillText("people in pressure column (solid) · forecast (dot)", 8, 14);
+  ctx.fillStyle = "#f0883e"; ctx.fillText("■ burst", cv.width-120, 14);
+  ctx.fillStyle = "#58a6ff"; ctx.fillText("■ phased", cv.width-60, 14);
+}
+
+const ACTC = {HOLD_RELEASE:"#f0883e", RESUME_RELEASE:"#3fb950",
+              SOUND_ALARM:"#f85149", ESCALATE:"#d29922"};
+
+function renderCalls(){
+  const el = document.getElementById("calls");
+  const rows = [];
+  for(let i=0; i<=k && i<R.burst.ticks.length; i++){
+    const c = R.burst.ticks[i].call;
+    if(c) rows.push(
+      `<div style="margin-bottom:6px"><b style="color:${ACTC[c.action]||'#c9d1d9'}">` +
+      `t=${R.burst.ticks[i].t}s ${c.action}</b><br>` +
+      `<span style="color:var(--dim)">${c.instruction}</span></div>`);
+  }
+  el.innerHTML = rows.length ? rows.join("") :
+      '<span style="color:var(--dim)">no calls yet</span>';
+  el.scrollTop = el.scrollHeight;
+}
+
+function render(){
+  drawVenue("burst"); drawVenue("phased"); drawTrend(); renderCalls();
+  const b = R.burst.ticks[Math.min(k,R.burst.ticks.length-1)];
+  const p = R.phased.ticks[Math.min(k,R.phased.ticks.length-1)];
+  document.getElementById("s-t").textContent = b.t + "s";
+  document.getElementById("s-pinned").textContent = b.pinned + " / " + p.pinned;
+  document.getElementById("s-fc").textContent =
+      b.forecast_peak.toFixed(1) + " / " + p.forecast_peak.toFixed(1);
+  document.getElementById("seek").value = k;
+  document.getElementById("tlabel").textContent = `tick ${k+1}/${N}`;
+}
+
+async function init(){
+  for(const arm of ["burst","phased"])
+    R[arm] = await (await fetch("/api/replay/"+arm)).json();
+  N = Math.min(R.burst.ticks.length, R.phased.ticks.length);
+  document.getElementById("seek").max = N-1;
+  const pb = await (await fetch("/api/playbook")).json();
+  const tbl = document.getElementById("playbook");
+  pb.slice(0,10).forEach((r,i)=>{
+    const tr = tbl.insertRow();
+    tr.innerHTML = `<td class="${i===0?'best':''}">${r.schedule}</td>` +
+                   `<td>${r.W} m</td><td>${r.crowd_at_risk}</td>`;
+  });
+  render();
+  document.getElementById("play").onclick = ()=>{
+    playing = !playing;
+    document.getElementById("play").textContent = playing ? "⏸ Pause" : "▶ Play";
+  };
+  document.getElementById("seek").oninput = e=>{
+    k = +e.target.value;
+    latch = {burst:["clear",null], phased:["clear",null]};
+    for(let i=0;i<=k;i++) for(const arm of ["burst","phased"]){
+      const t = R[arm].ticks[Math.min(i,R[arm].ticks.length-1)];
+      if(RANK[t.band] > RANK[latch[arm][0]]) latch[arm] = [t.band, t.t];
+    }
+    render();
+  };
+  setInterval(()=>{ if(playing){ k = (k+1) % N; render(); } }, 120);
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[project]
+name = "pravah"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.24","scipy>=1.11","matplotlib>=3.7","pyyaml>=6.0","cma>=3.3","shapely>=2.0","pandas>=2.0","scikit-learn>=1.7"]
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+perception = ["opencv-python>=4.8", "torch>=2.0", "huggingface_hub>=0.20"]
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sim*"]

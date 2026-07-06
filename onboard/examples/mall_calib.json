@@ -1,0 +1,7 @@
+{
+ "note": "[ASSUMPTION] Demo calibration for the public Mall dataset camera (640x480, oblique). No surveyed reference points exist for this camera; the correspondences below are visually plausible estimates of the walkway plane (~12x9 m). RELATIVE density evolution and alarm logic are meaningful; absolute ped/m2 carries this tag. Real deployments: survey >=4 floor points and use scripts/phaseA_calibrate.py.",
+ "image_points": [[110, 460], [610, 430], [470, 130], [200, 140]],
+ "world_points": [[0.0, 0.0], [12.0, 0.0], [12.0, 9.0], [0.0, 9.0]],
+ "world_extent": [0.0, 12.0, 0.0, 9.0],
+ "cell_m": 1.0
+}
