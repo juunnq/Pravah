@@ -37,10 +37,10 @@ prevent the fall; release policy decides how many people are standing in its
 blast radius.
 
 **3. A millisecond decision brain**: a surrogate model trained
-on 240 physics simulations answers "how dangerous is this configuration?" in
-~1 ms (crowd-at-risk MAE 11.3 people on configurations it never saw), and a
-forecaster predicts zone density 30 s ahead (halves the error of trend
-extrapolation on held-out runs). The full C4-physics calibration confirmed
+on 840 physics simulations answers "how dangerous is this configuration?" in
+~1 ms (crowd-at-risk MAE 7.9 people on configurations it never saw), and a
+forecaster predicts zone density 30 s ahead (cuts the error of trend
+extrapolation by 60% on held-out runs). The full C4-physics calibration confirmed
 the training labels within ~6 people with the policy ranking preserved 10/10.
 
 **4. Working perception**: pretrained crowd-density CNN

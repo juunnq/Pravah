@@ -56,8 +56,8 @@ fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.9))
 # (a) surrogate vs baselines — surrogate_eval.csv, target = max_pinned_upstream
 ax = axes[0]
 names = ["predict\nthe mean", "linear\nregression", "GBM\nsurrogate"]
-mae = [32.29, 14.94, 11.26]
-ci = [(30.23, 33.95), (13.79, 16.22), (10.30, 12.38)]
+mae = [31.31, 14.96, 7.86]
+ci = [(30.25, 32.39), (14.24, 15.66), (7.34, 8.41)]
 colors = [GREY, GREY, GREEN]
 err = np.array([[m - lo for m, (lo, hi) in zip(mae, ci)],
                 [hi - m for m, (lo, hi) in zip(mae, ci)]])
@@ -67,17 +67,17 @@ for i, m in enumerate(mae):
     ax.text(i, m + 2.2, f"{m:.1f}", ha="center", fontsize=10, fontweight="bold")
 ax.set_ylabel("held-out MAE (people at risk)")
 ax.set_ylim(0, 40)
-ax.set_title("Risk surrogate vs. baselines\n(240 runs, GroupKFold, bootstrap 95% CI)",
+ax.set_title("Risk surrogate vs. baselines\n(840 runs, GroupKFold, bootstrap 95% CI)",
              fontsize=10.5)
 
 # (b) forecaster vs trend extrapolation — forecaster.joblib bundle
 ax = axes[1]
 names = ["rate-of-rise\nextrapolation", "trained zone\nforecaster"]
-mae = [1.058, 0.532]
+mae = [1.063, 0.421]
 ax.bar(names, mae, color=[GREY, GREEN], alpha=0.8, width=0.5)
 for i, m in enumerate(mae):
     ax.text(i, m + 0.03, f"{m:.2f}", ha="center", fontsize=10, fontweight="bold")
-ax.annotate("−50%", xy=(1, 0.60), xytext=(0.42, 0.92), fontsize=11,
+ax.annotate("−60%", xy=(1, 0.49), xytext=(0.42, 0.90), fontsize=11,
             color=GREEN, fontweight="bold",
             arrowprops=dict(arrowstyle="->", color=GREEN, lw=1.2))
 ax.set_ylabel("held-out MAE (ped/m², 30 s ahead)")

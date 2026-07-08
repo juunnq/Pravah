@@ -58,24 +58,24 @@ held-out data. All three did; the margins below are regenerable from the
 scripts in `scripts/`.
 
 <p align="center">
-  <img src="docs/comparative_models.svg" alt="Three-panel comparison: (1) GBM risk surrogate MAE 11.3 vs 14.9 linear regression and 32.3 predict-the-mean, with bootstrap confidence intervals; (2) trained zone forecaster MAE 0.53 ped/m2 at 30 s horizon vs 1.06 for rate-of-rise extrapolation; (3) held-out count error on real footage drops from 35.9% to 8.9% for CSRNet and 7.8% to 6.7% for CLIP-EBC with a per-camera scalar" width="900">
+  <img src="docs/comparative_models.svg" alt="Three-panel comparison: (1) GBM risk surrogate MAE 7.9 vs 15.0 linear regression and 31.3 predict-the-mean, with bootstrap confidence intervals; (2) trained zone forecaster MAE 0.42 ped/m2 at 30 s horizon vs 1.06 for rate-of-rise extrapolation; (3) held-out count error on real footage drops from 35.9% to 8.9% for CSRNet and 7.8% to 6.7% for CLIP-EBC with a per-camera scalar" width="900">
 </p>
 
 | Component | Baseline | Pravah | Protocol |
 |---|---|---|---|
-| Risk surrogate (people at risk) | predict-the-mean 32.3 · linear 14.9 | **GBM 11.3** (95% CI 10.3–12.4) | 240 oracle runs, GroupKFold by configuration, bootstrap CIs |
-| Density forecaster (ped/m², 30 s ahead) | rate-of-rise extrapolation 1.06 | **0.53** (−50%) | held-out runs — no window from a training run is ever scored |
+| Risk surrogate (people at risk) | predict-the-mean 31.3 · linear 15.0 | **GBM 7.9** (95% CI 7.3–8.4) | 840 oracle runs, GroupKFold by configuration, bootstrap CIs |
+| Density forecaster (ped/m², 30 s ahead) | rate-of-rise extrapolation 1.06 | **0.42** (−60%) | held-out runs — no window from a training run is ever scored |
 | Perception on real footage (count error) | CSRNet off-the-shelf 35.9% | **8.9%** calibrated · CLIP-EBC **6.7%** | Mall dataset; scalar fit on 100 frames, error on held-out frames |
 
 Three comparisons worth reading closely:
 
 - **The surrogate answers in ~1 ms what the oracle answers in ~15–20 min** (a
   full C4 physics run at 150 agents) — a ~10⁶× speedup at a quantified
-  accuracy cost (MAE 11.3 on a 22–122 range), which is what makes what-if
+  accuracy cost (MAE 7.9 on a 12–145 range), which is what makes what-if
   policy queries interactive. A C4 confirmation pass showed the cheaper
   training labels track the full physics within ~6 people with the policy
   ranking preserved 10/10.
-- **The forecaster halves trend extrapolation** precisely where it matters:
+- **The forecaster cuts trend-extrapolation error by 60%** precisely where it matters:
   extrapolation overshoots during saturation (predicting indefinitely rising
   density where the crowd jams), which is what triggers false escalations in
   a naive system.
